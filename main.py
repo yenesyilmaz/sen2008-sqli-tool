@@ -13,6 +13,7 @@ Modes:
   sast <path>    static analysis of a Python file or folder
   waf            start the mini WAF server
   waf-demo       start the WAF and send it sample requests
+  web            start the browser-based web UI
 """
 
 import os
@@ -201,6 +202,12 @@ def run_waf(host, port):
     start_waf(host, port)
 
 
+def run_web(host, port):
+    from web.server import start_web
+    print(c.color("\n[MODE] Web UI", c.BOLD, c.CYAN))
+    start_web(host, port)
+
+
 def run_waf_demo():
     import threading
     import urllib.request
@@ -261,10 +268,11 @@ def main():
             "  python main.py sast samples/vulnerable_app.py\n"
             "  python main.py waf                   # start the WAF server\n"
             "  python main.py waf-demo              # WAF + automatic sample requests\n"
+            "  python main.py web                   # browser-based web UI\n"
         ),
     )
     parser.add_argument("mode", nargs="?", default="analyze",
-                        choices=["analyze", "demo", "sast", "waf", "waf-demo"],
+                        choices=["analyze", "demo", "sast", "waf", "waf-demo", "web"],
                         help="tool mode (default: analyze)")
     parser.add_argument("target", nargs="?", default=None,
                         help="file or directory path (for sast mode)")
@@ -282,6 +290,8 @@ def main():
         run_waf(args.host, args.port)
     elif args.mode == "waf-demo":
         run_waf_demo()
+    elif args.mode == "web":
+        run_web(args.host, args.port)
 
 
 if __name__ == "__main__":

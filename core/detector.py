@@ -21,6 +21,7 @@ class DetectionResult:
     bypass_attempts: List[str] = field(default_factory=list)
     sanitized_value: str = ""
     score_breakdown: dict = field(default_factory=dict)
+    normalized_value: str = ""
 
 
 class SQLiDetector:
@@ -134,6 +135,7 @@ class SQLiDetector:
             return result
 
         normalized, bypasses = self._normalize(value)
+        result.normalized_value = normalized
         result.bypass_attempts = bypasses
         result.matched_patterns = self._match_patterns(normalized)
         result.matched_keywords = self._check_keywords(normalized)

@@ -30,9 +30,13 @@ python main.py sast samples/vulnerable_app.py   # analyze one file
 python main.py sast samples/                     # analyze a folder
 python main.py waf             # start the WAF on 127.0.0.1:8080
 python main.py waf-demo        # start the WAF and send it sample requests
+python main.py web             # start the browser-based web UI (http://127.0.0.1:8080)
 ```
 
 `python main.py demo` is the easiest thing to show; it runs everything in one go.
+
+On Windows you can also just double-click `run_web.bat` (web UI), `run.bat`
+(interactive analyzer) or `run_demo.bat` (auto demo) instead of using the terminal.
 
 ## Project structure
 
@@ -47,6 +51,8 @@ sqli_tool/
     analyzer.py           AST-based static analyzer
   waf/
     firewall.py           mini web application firewall
+  web/
+    server.py             browser-based web UI (same detection engine)
   samples/
     vulnerable_app.py     test file with deliberate SQLi bugs
 ```
