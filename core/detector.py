@@ -20,6 +20,7 @@ class DetectionResult:
     is_whitelisted: bool = False
     bypass_attempts: List[str] = field(default_factory=list)
     sanitized_value: str = ""
+    score_breakdown: dict = field(default_factory=dict)
 
 
 class SQLiDetector:
@@ -93,20 +94,19 @@ class SQLiDetector:
         upper = value.upper()
         return [kw for kw in DANGEROUS_KEYWORDS if re.search(r'\b' + kw + r'\b', upper)]
 
-    def _calculate_risk(self, matched_patterns, matched_keywords, bypasses, value) -> Tuple[int, str]:
-        score = 0
-        if matched_patterns:
-            score += min(len(matched_patterns) * RISK_WEIGHTS["pattern_match"], 60)
-        if matched_keywords:
-            kw_score = len(matched_keywords) * (RISK_WEIGHTS["keyword_density"] // 4)
-            score += min(kw_score, RISK_WEIGHTS["keyword_density"])
-        special_chars = re.findall(r"['\";`\\]", value)
-        if special_chars:
-            score += min(len(special_chars) * 3, RISK_WEIGHTS["special_chars"])
-        if bypasses:
-            score += min(len(bypasses) * (RISK_WEIGHTS["encoding_bypass"] // 2),
-                         RISK_WEIGHTS["encoding_bypass"])
-        score = min(score, 100)
+    def _calculate_risk(self, matched_patterns, matched_keywords, bypasses, value) -> Tuple[int, str, dict]:
+        # each signal contributes points; the total (capped at 100) gives the level
+        pattern_pts = min(len(matched_patterns) * RISK_WEIGHTS["pattern_match"], 60) if matched_patterns else 0
+        keyword_pts = min(len(matched_keywords) * (RISK_WEIGHTS["keyword_density"] // 4),
+                          RISK_WEIGHTS["keyword_density"]) if matched_keywords else 0
+        special = re.findall(r"['\";`\\]", value)
+        special_pts = min(len(special) * 3, RISK_WEIGHTS["special_chars"]) if special else 0
+        bypass_pts = min(len(bypasses) * (RISK_WEIGHTS["encoding_bypass"] // 2),
+                         RISK_WEIGHTS["encoding_bypass"]) if bypasses else 0
+
+        score = min(pattern_pts + keyword_pts + special_pts + bypass_pts, 100)
+        breakdown = {"patterns": pattern_pts, "keywords": keyword_pts,
+                     "special_chars": special_pts, "encoding": bypass_pts}
 
         if score == 0:
             level = "SAFE"
@@ -118,7 +118,7 @@ class SQLiDetector:
             level = "HIGH"
         else:
             level = "CRITICAL"
-        return score, level
+        return score, level, breakdown
 
     def analyze(self, value: str) -> DetectionResult:
         result = DetectionResult(
@@ -137,7 +137,7 @@ class SQLiDetector:
         result.bypass_attempts = bypasses
         result.matched_patterns = self._match_patterns(normalized)
         result.matched_keywords = self._check_keywords(normalized)
-        result.risk_score, result.risk_level = self._calculate_risk(
+        result.risk_score, result.risk_level, result.score_breakdown = self._calculate_risk(
             result.matched_patterns, result.matched_keywords, bypasses, normalized
         )
         result.is_malicious = result.risk_score > 25

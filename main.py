@@ -30,6 +30,17 @@ SAMPLE_FILE = os.path.join(SAMPLES_DIR, "vulnerable_app.py")
 
 SEVERITY_ORDER = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "SAFE": 4}
 
+EXAMPLE_INPUTS = [
+    "Hello, how are you?",
+    "O'Connor",
+    "SELECT * FROM products WHERE price > 100",
+    "admin'--",
+    "1 AND SLEEP(5)",
+    "1 UNION SELECT username, password FROM users",
+    "admin' OR '1'='1",
+    "%27%20OR%201%3D1",
+]
+
 
 def print_banner():
     print(c.color("=" * 65, c.CYAN))
@@ -43,10 +54,34 @@ def risk_badge(level, score):
     return c.color(f"[{level}]", c.BOLD, c.risk_color(level)) + c.color(f" ({score}/100)", c.DIM)
 
 
+def explain_score(result):
+    # turn the score into a human-readable reason (where the points came from)
+    if result.is_whitelisted:
+        return "whitelisted (safe value, e.g. a real name)"
+    bd = result.score_breakdown
+    parts = []
+    if bd.get("patterns"):
+        parts.append(f"attack pattern +{bd['patterns']}")
+    if bd.get("keywords"):
+        parts.append(f"SQL keywords +{bd['keywords']}")
+    if bd.get("special_chars"):
+        parts.append(f"special chars +{bd['special_chars']}")
+    if bd.get("encoding"):
+        parts.append(f"decoded payload +{bd['encoding']}")
+    return ", ".join(parts) if parts else "nothing suspicious matched"
+
+
+def print_examples():
+    print(c.color("\n  Copy and paste one of these to try it:", c.BOLD, c.CYAN))
+    for ex in EXAMPLE_INPUTS:
+        print(c.color(f"    {ex}", c.YELLOW))
+    print()
+
+
 def run_analyzer():
     detector = SQLiDetector()
     print(c.color("\n[MODE] Input Analyzer", c.BOLD, c.CYAN))
-    print(c.color("  Type an input to analyze it. Commands: 'demo', 'exit'.\n", c.DIM))
+    print(c.color("  Type an input to analyze it. Commands: 'demo', 'example', 'exit'.\n", c.DIM))
 
     while True:
         try:
@@ -62,6 +97,9 @@ def run_analyzer():
         if user_input.lower() == "demo":
             run_detector_cases(detector)
             continue
+        if user_input.lower() == "example":
+            print_examples()
+            continue
 
         print_analysis_result(detector.analyze(user_input))
 
@@ -70,6 +108,7 @@ def print_analysis_result(result):
     print(c.color(c.rule(), c.DIM))
     print(f"  Input:  {result.input_value[:80]}")
     print(f"  Status: {risk_badge(result.risk_level, result.risk_score)}")
+    print(c.color(f"  Why:    {explain_score(result)}", c.DIM))
 
     if result.is_whitelisted:
         print(c.color("  [OK] Whitelisted - false positive prevented", c.GREEN))
@@ -78,8 +117,6 @@ def print_analysis_result(result):
     else:
         print(c.color("  [OK] SAFE - input appears clean", c.GREEN))
 
-    if result.bypass_attempts:
-        print(c.color(f"  Bypass attempts: {', '.join(result.bypass_attempts)}", c.YELLOW))
     if result.matched_keywords:
         print(c.color(f"  Dangerous keywords: {', '.join(result.matched_keywords)}", c.RED))
     if result.matched_patterns:
@@ -103,17 +140,21 @@ def run_detector_cases(detector):
         ("SELECT * FROM products WHERE price > 100", "Developer SQL (not an attack)"),
         ("Hello, how are you?", "Normal safe input"),
     ]
-    print(c.color(f"\n[Analyzer] Running {len(cases)} test cases:\n", c.BOLD, c.CYAN))
+    print(c.color(f"\n[Analyzer] Running {len(cases)} test cases", c.BOLD, c.CYAN))
+    print(c.color("  (the last column shows WHY the input got that score)\n", c.DIM))
     for payload, label in cases:
         r = detector.analyze(payload)
         if r.is_whitelisted:
-            verdict = c.color("WHITELISTED", c.GREEN)
+            verdict, vcol = "WHITELISTED", c.GREEN
         elif r.is_malicious:
-            verdict = c.color("BLOCKED", c.RED)
+            verdict, vcol = "BLOCKED", c.RED
         else:
-            verdict = c.color("ALLOWED", c.GREEN)
-        level = c.color(f"{r.risk_level:<8}", c.risk_color(r.risk_level))
-        print(f"  {label:<35} {level} {verdict}")
+            verdict, vcol = "ALLOWED", c.GREEN
+        risk = f"{r.risk_level} ({r.risk_score})"
+        print(f"  {label:<33}"
+              f"{c.color(f'{risk:<12}', c.risk_color(r.risk_level))} "
+              f"{c.color(f'{verdict:<12}', vcol)} "
+              f"{c.color(explain_score(r), c.DIM)}")
     print()
 
 
