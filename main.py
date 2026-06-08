@@ -82,7 +82,7 @@ def print_examples():
 def run_analyzer():
     detector = SQLiDetector()
     print(c.color("\n[MODE] Input Analyzer", c.BOLD, c.CYAN))
-    print(c.color("  Type an input to analyze it. Commands: 'demo', 'example', 'exit'.\n", c.DIM))
+    print(c.color("  Type an input to analyze it. Commands: 'demo', 'example', 'web', 'exit'.\n", c.DIM))
 
     while True:
         try:
@@ -100,6 +100,12 @@ def run_analyzer():
             continue
         if user_input.lower() == "example":
             print_examples()
+            continue
+        if user_input.lower() == "web":
+            try:
+                run_web("127.0.0.1", 8080)
+            except OSError as e:
+                print(c.color(f"  Could not start the web server (is port 8080 in use?): {e}", c.RED))
             continue
 
         print_analysis_result(detector.analyze(user_input))
